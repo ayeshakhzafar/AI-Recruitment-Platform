@@ -6,13 +6,22 @@ An intelligent, enterprise-grade talent acquisition and end-to-end recruitment p
 
 ## 📸 System Interface Preview
 
+## 📸 System Interface Preview
+
 <p align="center">
-  <img src="./HR-Finalproj-main/screenshots/ss1.png" width="45%" alt="Module Preview 1" />
-  <img src="./screenshots/ss2.png" width="45%" alt="Module Preview 2" />
-   <img src="./screenshots/ss3.png" width="45%" alt="Module Preview 3" />
-   <img src="./screenshots/ss4.png" width="45%" alt="Module Preview 4" />
-   <img src="./screenshots/ss5.png" width="45%" alt="Module Preview 5" />
-   <img src="./screenshots/ss6.png" width="45%" alt="Module Preview 6" />
+  <!-- Row 1 -->
+  <img src="ss3.jpeg" width="48%" alt="Home Page" />
+  <img src="ss2.png" width="48%" alt="Home Page 2" />
+  <br/><br/>
+  
+  <!-- Row 2 -->
+  <img src="ss4.png" width="48%" alt="Dashboard" />
+  <img src="ss5.png" width="48%" alt="Dashboard" />
+  <br/><br/>
+  
+  <!-- Row 3 -->
+  <img src="ss1.png" width="48%" alt="Coding Assessment" />
+  <img src="ss6.png" width="48%" alt="Interview Page" />
 </p>
 
 ## 📸 System Architecture & Visual Workflows
