@@ -1,0 +1,756 @@
+/* ==================== CSS Variables ==================== */
+:root {
+    --navy-dark: #0a1628;
+    --navy-medium: #1a2d4a;
+    --navy-light: #2a4a6a;
+    --white: #ffffff;
+    --white-light: #f5f7fa;
+    --gray-dark: #4a5568;
+    --gray-medium: #718096;
+    --gray-light: #cbd5e0;
+    --accent-blue: #3182ce;
+    --accent-green: #38a169;
+    --accent-red: #e53e3e;
+    --accent-orange: #dd6b20;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --transition: all 0.2s ease;
+}
+
+/* ==================== Reset & Base ==================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--navy-dark);
+    color: var(--white);
+    overflow: hidden;
+}
+
+/* ==================== Hidden Utility ==================== */
+.hidden {
+    display: none !important;
+}
+
+/* ==================== Face Alert Banner ==================== */
+.face-alert-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, var(--accent-red), #c53030);
+    color: var(--white);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 1000;
+    font-weight: 500;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+.alert-icon {
+    font-size: 1.2rem;
+}
+
+/* ==================== App Container ==================== */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding-top: 50px; /* Space for alert banner when visible */
+}
+
+/* ==================== Top Bar ==================== */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    background: var(--navy-medium);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+}
+
+.candidate-info {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.candidate-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--white);
+}
+
+.job-role {
+    font-size: 0.9rem;
+    color: var(--gray-light);
+    font-weight: 400;
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.face-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.face-status.verified {
+    background: rgba(56, 161, 105, 0.2);
+    color: var(--accent-green);
+}
+
+.face-status.alert {
+    background: rgba(229, 62, 62, 0.2);
+    color: var(--accent-red);
+    animation: pulse 1s infinite;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.session-timer {
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--white-light);
+}
+
+/* ==================== Main Content ==================== */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ==================== Video Panel (60%) ==================== */
+.video-panel {
+    flex: 0 0 60%;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    background: var(--navy-dark);
+}
+
+.video-container {
+    position: relative;
+    flex: 1;
+    background: #000;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+#webcam {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* Mirror effect */
+}
+
+#overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* ==================== Emotion Badge ==================== */
+.emotion-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 24px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 10;
+}
+
+.emotion-emoji {
+    font-size: 1.2rem;
+}
+
+.emotion-text {
+    color: var(--white);
+}
+
+/* ==================== Chat Panel (40%) ==================== */
+.chat-panel {
+    flex: 0 0 40%;
+    display: flex;
+    flex-direction: column;
+    background: var(--navy-medium);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--white-light);
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ==================== Messages ==================== */
+.message {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.user {
+    align-self: flex-end;
+    background: var(--accent-blue);
+    color: var(--white);
+    border-bottom-right-radius: 4px;
+}
+
+.message.assistant {
+    align-self: flex-start;
+    background: var(--navy-light);
+    color: var(--white);
+    border-bottom-left-radius: 4px;
+}
+
+.message-content {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.message-time {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 4px;
+}
+
+.message.assistant .message-time {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ==================== Bottom Bar ==================== */
+.bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: var(--navy-medium);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* ==================== Mic Button ==================== */
+.mic-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    background: var(--accent-blue);
+    color: var(--white);
+    border: none;
+    border-radius: 30px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.mic-button:hover {
+    background: #2c5282;
+    transform: scale(1.02);
+}
+
+.mic-button:active {
+    background: var(--accent-orange);
+    transform: scale(0.98);
+}
+
+.mic-button svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ==================== Status Indicator ==================== */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.status-icon {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-icon.idle {
+    background: var(--gray-medium);
+}
+
+.status-icon.connected {
+    background: var(--accent-green);
+    box-shadow: 0 0 8px var(--accent-green);
+}
+
+.status-icon.recording {
+    background: var(--accent-red);
+    animation: pulse 1s infinite;
+}
+
+.status-icon.disconnected {
+    background: var(--gray-light);
+}
+
+.status-icon.error {
+    background: var(--accent-red);
+}
+
+.status-text {
+    color: var(--gray-light);
+}
+
+/* ==================== End Interview Button ==================== */
+.end-button {
+    padding: 10px 20px;
+    background: transparent;
+    color: var(--accent-red);
+    border: 2px solid var(--accent-red);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.end-button:hover {
+    background: var(--accent-red);
+    color: var(--white);
+}
+
+/* ==================== Modal ==================== */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(5px);
+}
+
+.modal-content {
+    background: var(--navy-medium);
+    padding: 32px;
+    border-radius: var(--radius-lg);
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+}
+
+.modal-content h2 {
+    font-size: 1.5rem;
+    margin-bottom: 24px;
+    color: var(--white);
+}
+
+/* ==================== Score Display ==================== */
+.score-display {
+    margin: 24px 0;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md);
+}
+
+.score-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: var(--accent-green);
+    line-height: 1;
+}
+
+.score-label {
+    font-size: 0.9rem;
+    color: var(--gray-light);
+    margin-top: 8px;
+}
+
+/* ==================== Report Section ==================== */
+.report-section {
+    text-align: left;
+    margin: 20px 0;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-md);
+}
+
+.report-section h3 {
+    font-size: 0.9rem;
+    color: var(--gray-light);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.report-section ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.report-section li {
+    padding: 6px 0;
+    color: var(--white-light);
+    font-size: 0.9rem;
+    position: relative;
+    padding-left: 20px;
+}
+
+.report-section li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--accent-green);
+}
+
+.recommendation {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent-green);
+    text-align: center;
+    padding: 12px;
+    background: rgba(56, 161, 105, 0.1);
+    border-radius: var(--radius-md);
+}
+
+/* ==================== Close Modal Button ==================== */
+.close-modal-button {
+    margin-top: 24px;
+    padding: 12px 32px;
+    background: var(--accent-blue);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.close-modal-button:hover {
+    background: #2c5282;
+}
+
+/* ==================== Scrollbar ==================== */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--navy-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--navy-light);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-medium);
+}
+
+/* ==================== Responsive ==================== */
+@media (max-width: 1024px) {
+    .main-content {
+        flex-direction: column;
+    }
+    
+    .video-panel,
+    .chat-panel {
+        flex: none;
+        height: 50%;
+    }
+    
+    .chat-panel {
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+}
+
+@media (max-width: 768px) {
+    .top-bar {
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+    }
+    
+    .candidate-info {
+        flex-direction: column;
+        gap: 4px;
+        align-items: center;
+    }
+    
+    .bottom-bar {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .controls {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .mic-button span {
+        display: none;
+    }
+}
+
+/* ==================== Verification Modal ==================== */
+.verification-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #1a1f35 0%, #0d1321 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.verification-content {
+    background: var(--navy-medium);
+    padding: 32px;
+    border-radius: var(--radius-lg);
+    max-width: 450px;
+    width: 90%;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.verification-content h2 {
+    font-size: 1.75rem;
+    margin-bottom: 12px;
+    color: var(--white);
+}
+
+.verification-content p {
+    color: var(--gray-light);
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+}
+
+.verification-video-container {
+    width: 100%;
+    height: 280px;
+    background: #0a0f1a;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.verification-video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
+.capture-button {
+    width: 100%;
+    padding: 14px 24px;
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.capture-button:hover {
+    background: #3b82f6;
+}
+
+.verification-status {
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--gray-light);
+}
+
+.verification-status .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--gray-dark);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.verification-result {
+    margin: 20px 0;
+    padding: 16px;
+    border-radius: var(--radius-md);
+}
+
+.verification-result.success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.verification-result.failure {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.result-icon {
+    font-size: 3rem;
+    margin-bottom: 8px;
+}
+
+.result-message {
+    color: var(--white);
+    font-size: 1rem;
+    margin-bottom: 16px;
+}
+
+.proceed-button {
+    padding: 12px 32px;
+    background: var(--accent-green);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.proceed-button:hover {
+    background: #16a34a;
+}
+
+.retry-button {
+    padding: 12px 32px;
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.retry-button:hover {
+    background: #3b82f6;
+}
+
+.skip-button {
+    background: transparent;
+    color: var(--gray-light);
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-top: 16px;
+    text-decoration: underline;
+}
+
+.skip-button:hover {
+    color: var(--white);
+}

@@ -1,0 +1,23 @@
+{
+  "face_validation": {
+    "samples": 5,
+    "tp": 2,
+    "tn": 1,
+    "fp": 1,
+    "fn": 1,
+    "accuracy": 0.6,
+    "precision": 0.6667,
+    "recall": 0.6667,
+    "specificity": 0.5,
+    "f1_score": 0.6667
+  },
+  "stt_validation": {
+    "samples": 3,
+    "word_errors": 4,
+    "total_reference_words": 28,
+    "wer": 0.1429,
+    "char_errors": 5,
+    "total_reference_chars": 155,
+    "cer": 0.0323
+  }
+}

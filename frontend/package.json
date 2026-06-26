@@ -1,0 +1,45 @@
+{
+  "name": "custom-mcq-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@monaco-editor/react": "^4.6.0",
+    "@mui/icons-material": "^7.3.7",
+    "@mui/material": "^7.3.6",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "axios": "^1.13.3",
+    "face-api.js": "^0.22.2",
+    "firebase": "^10.12.3",
+    "framer-motion": "^7.10.3",
+    "framer-motion-3d": "^7.10.3",
+    "lucide-react": "^0.556.0",
+    "monaco-editor": "^0.44.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^7.9.6",
+    "recharts": "^3.4.1",
+    "tailwindcss": "^3.4.4",
+    "three": "^0.170.0",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "vite": "^5.4.21"
+  }
+}

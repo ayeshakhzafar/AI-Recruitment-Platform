@@ -1,0 +1,20 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+.hr-professional-app,
+.hr-professional-page {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.hr-professional-app input:focus-visible,
+.hr-professional-app select:focus-visible,
+.hr-professional-app textarea:focus-visible,
+.hr-professional-app button:focus-visible,
+.hr-professional-page input:focus-visible,
+.hr-professional-page select:focus-visible,
+.hr-professional-page textarea:focus-visible,
+.hr-professional-page button:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.45);
+  outline-offset: 2px;
+}

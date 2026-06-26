@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Report - RECRUTO</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ==================== CSS Variables ==================== */
+        :root {
+            --navy-dark: #0a1628;
+            --navy-medium: #1a2d4a;
+            --navy-light: #2a4a6a;
+            --white: #ffffff;
+            --white-light: #f5f7fa;
+            --gray-dark: #4a5568;
+            --gray-medium: #718096;
+            --gray-light: #cbd5e0;
+            --accent-blue: #3182ce;
+            --accent-green: #38a169;
+            --accent-red: #e53e3e;
+            --accent-orange: #dd6b20;
+            --accent-purple: #805ad5;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        /* ==================== Reset & Base ==================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--navy-dark);
+            color: var(--white);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ==================== Container ==================== */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ==================== Header ==================== */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            color: var(--white);
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--gray-light);
+        }
+
+        /* ==================== Score Section ==================== */
+        .score-section {
+            background: var(--navy-medium);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-bottom: 24px;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .score-meter {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 24px;
+        }
+
+        .score-circle {
+            transform: rotate(-90deg);
+        }
+
+        .score-circle-bg {
+            fill: none;
+            stroke: var(--navy-light);
+            stroke-width: 12;
+        }
+
+        .score-circle-fill {
+            fill: none;
+            stroke-width: 12;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease;
+        }
+
+        .score-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--white);
+        }
+
+        .score-label {
+            font-size: 1.2rem;
+            color: var(--gray-light);
+        }
+
+        .recommendation-badge {
+            display: inline-block;
+            padding: 12px 32px;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-top: 16px;
+        }
+
+        .recommendation-badge.hire {
+            background: rgba(56, 161, 105, 0.2);
+            color: var(--accent-green);
+            border: 2px solid var(--accent-green);
+        }
+
+        .recommendation-badge.consider {
+            background: rgba(221, 107, 32, 0.2);
+            color: var(--accent-orange);
+            border: 2px solid var(--accent-orange);
+        }
+
+        .recommendation-badge.reject {
+            background: rgba(229, 62, 62, 0.2);
+            color: var(--accent-red);
+            border: 2px solid var(--accent-red);
+        }
+
+        .recommendation-badge.strong-hire {
+            background: rgba(49, 130, 206, 0.2);
+            color: var(--accent-blue);
+            border: 2px solid var(--accent-blue);
+        }
+
+        /* ==================== Grid Layout ==================== */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ==================== Card ==================== */
+        .card {
+            background: var(--navy-medium);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--white-light);
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* ==================== Lists ==================== */
+        .list {
+            list-style: none;
+        }
+
+        .list li {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--white-light);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .list li:last-child {
+            border-bottom: none;
+        }
+
+        .list-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.8rem;
+        }
+
+        .list-icon.strength {
+            background: rgba(56, 161, 105, 0.2);
+            color: var(--accent-green);
+        }
+
+        .list-icon.concern {
+            background: rgba(221, 107, 32, 0.2);
+            color: var(--accent-orange);
+        }
+
+        /* ==================== Chart Container ==================== */
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+
+        /* ==================== Table ==================== */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--gray-light);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            color: var(--white-light);
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .score-cell {
+            font-weight: 600;
+            color: var(--accent-green);
+        }
+
+        .score-cell.low {
+            color: var(--accent-orange);
+        }
+
+        .score-cell.critical {
+            color: var(--accent-red);
+        }
+
+        /* ==================== Emotion Summary ==================== */
+        .emotion-summary {
+            margin-top: 16px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+        }
+
+        .emotion-summary p {
+            color: var(--white-light);
+            line-height: 1.6;
+        }
+
+        /* ==================== Loading ==================== */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--navy-light);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ==================== Error ==================== */
+        .error {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--accent-red);
+        }
+
+        .error h2 {
+            margin-bottom: 16px;
+        }
+
+        /* ==================== Back Button ==================== */
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--navy-light);
+            color: var(--white);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            margin-bottom: 24px;
+            transition: all 0.2s;
+        }
+
+        .back-button:hover {
+            background: var(--accent-blue);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="interview.html" class="back-button">
+            ← Back to Interview
+        </a>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            <h2>Report Not Found</h2>
+            <p>The requested interview report could not be found.</p>
+        </div>
+
+        <div id="report" style="display: none;">
+            <!-- Header -->
+            <header class="header">
+                <h1>Interview Assessment Report</h1>
+                <p id="session-info">Session ID: <span id="session-id"></span></p>
+            </header>
+
+            <!-- Score Section -->
+            <section class="score-section">
+                <div class="score-meter">
+                    <svg class="score-circle" width="200" height="200" viewBox="0 0 200 200">
+                        <circle class="score-circle-bg" cx="100" cy="100" r="85"></circle>
+                        <circle class="score-circle-fill" id="score-circle" cx="100" cy="100" r="85" 
+                            stroke="var(--accent-green)" stroke-dasharray="534" stroke-dashoffset="534">
+                        </circle>
+                    </svg>
+                    <div class="score-value" id="score-value">0.0</div>
+                </div>
+                <div class="score-label">Overall Score</div>
+                <div class="recommendation-badge" id="recommendation-badge">Hire</div>
+            </section>
+
+            <!-- Grid -->
+            <div class="grid">
+                <!-- Strengths -->
+                <div class="card">
+                    <h3 class="card-title">✓ Strengths</h3>
+                    <ul class="list" id="strengths-list"></ul>
+                </div>
+
+                <!-- Concerns -->
+                <div class="card">
+                    <h3 class="card-title">⚠ Areas for Improvement</h3>
+                    <ul class="list" id="concerns-list"></ul>
+                </div>
+
+                <!-- Emotion Timeline -->
+                <div class="card">
+                    <h3 class="card-title">😊 Emotion Timeline</h3>
+                    <div class="chart-container">
+                        <canvas id="emotion-chart"></canvas>
+                    </div>
+                    <div class="emotion-summary" id="emotion-summary"></div>
+                </div>
+
+                <!-- Per-Question Scores -->
+                <div class="card">
+                    <h3 class="card-title">📊 Question Analysis</h3>
+                    <div class="table-container">
+                        <table id="questions-table">
+                            <thead>
+                                <tr>
+                                    <th>Question</th>
+                                    <th>Score</th>
+                                    <th>Sentiment</th>
+                                </tr>
+                            </thead>
+                            <tbody id="questions-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Configuration ====================
+        const CONFIG = {
+            apiUrl: 'http://localhost:8000'
+        };
+
+        // ==================== Get Session ID from URL ====================
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id') || 'session_demo';
+
+        // ==================== Load Report ====================
+        async function loadReport() {
+            try {
+                const response = await fetch(`${CONFIG.apiUrl}/analysis/report/${sessionId}`);
+                
+                if (!response.ok) {
+                    throw new Error('Report not found');
+                }
+                
+                const report = await response.json();
+                displayReport(report);
+                
+            } catch (error) {
+                console.error('Error loading report:', error);
+                showError();
+            }
+        }
+
+        // ==================== Display Functions ====================
+        function displayReport(report) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('report').style.display = 'block';
+            
+            // Session ID
+            document.getElementById('session-id').textContent = sessionId;
+            
+            // Overall Score
+            const score = report.overall_score || 0;
+            animateScore(score);
+            
+            // Recommendation Badge
+            const badge = document.getElementById('recommendation-badge');
+            const recommendation = (report.recommendation || '').toLowerCase();
+            
+            if (recommendation.includes('strong hire')) {
+                badge.className = 'recommendation-badge strong-hire';
+                badge.textContent = '★ Strong Hire';
+            } else if (recommendation.includes('hire')) {
+                badge.className = 'recommendation-badge hire';
+                badge.textContent = '✓ Hire';
+            } else if (recommendation.includes('consider')) {
+                badge.className = 'recommendation-badge consider';
+                badge.textContent = '? Consider';
+            } else {
+                badge.className = 'recommendation-badge reject';
+                badge.textContent = '✗ Reject';
+            }
+            
+            // Strengths
+            const strengthsList = document.getElementById('strengths-list');
+            strengthsList.innerHTML = (report.strengths || []).map(s => `
+                <li>
+                    <span class="list-icon strength">✓</span>
+                    ${escapeHtml(s)}
+                </li>
+            `).join('');
+            
+            // Concerns
+            const concernsList = document.getElementById('concerns-list');
+            concernsList.innerHTML = (report.concerns || []).map(c => `
+                <li>
+                    <span class="list-icon concern">!</span>
+                    ${escapeHtml(c)}
+                </li>
+            `).join('');
+            
+            // Emotion Summary
+            document.getElementById('emotion-summary').innerHTML = `
+                <p>${report.emotion_summary || 'No emotion data available'}</p>
+            `;
+            
+            // Question Analysis Table
+            const questionsBody = document.getElementById('questions-body');
+            const qaAnalyses = report.qa_analyses || [];
+            
+            if (qaAnalyses.length > 0) {
+                questionsBody.innerHTML = qaAnalyses.map(qa => {
+                    const score = qa.analysis?.score || 0;
+                    const sentiment = qa.analysis?.sentiment?.label || 'neutral';
+                    const questionPreview = qa.question ? 
+                        (qa.question.length > 50 ? qa.question.substring(0, 50) + '...' : qa.question) : 
+                        'N/A';
+                    
+                    let scoreClass = '';
+                    if (score < 5) scoreClass = 'critical';
+                    else if (score < 7) scoreClass = 'low';
+                    
+                    return `
+                        <tr>
+                            <td>${escapeHtml(questionPreview)}</td>
+                            <td class="score-cell ${scoreClass}">${score.toFixed(1)}</td>
+                            <td>${sentiment}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                questionsBody.innerHTML = '<tr><td colspan="3">No question analysis available</td></tr>';
+            }
+            
+            // Emotion Chart
+            renderEmotionChart(qaAnalyses);
+        }
+
+        function animateScore(targetScore) {
+            const scoreValue = document.getElementById('score-value');
+            const scoreCircle = document.getElementById('score-circle');
+            const circumference = 2 * Math.PI * 85; // r=85
+            
+            // Animate number
+            let currentScore = 0;
+            const duration = 1000;
+            const steps = 60;
+            const increment = targetScore / steps;
+            
+            const interval = setInterval(() => {
+                currentScore += increment;
+                if (currentScore >= targetScore) {
+                    currentScore = targetScore;
+                    clearInterval(interval);
+                }
+                scoreValue.textContent = currentScore.toFixed(1);
+            }, duration / steps);
+            
+            // Animate circle
+            const offset = circumference - (targetScore / 10) * circumference;
+            setTimeout(() => {
+                scoreCircle.style.strokeDashoffset = offset;
+                
+                // Change color based on score
+                if (targetScore >= 7) {
+                    scoreCircle.style.stroke = 'var(--accent-green)';
+                } else if (targetScore >= 5) {
+                    scoreCircle.style.stroke = 'var(--accent-orange)';
+                } else {
+                    scoreCircle.style.stroke = 'var(--accent-red)';
+                }
+            }, 100);
+        }
+
+        function renderEmotionChart(qaAnalyses) {
+            const ctx = document.getElementById('emotion-chart').getContext('2d');
+            
+            // Extract emotions from Q&A analyses
+            const emotions = [];
+            const labels = [];
+            
+            qaAnalyses.forEach((qa, index) => {
+                // This would ideally come from the actual emotion data
+                // For now, create a placeholder
+                if (index < 5) {
+                    labels.push(`Q${index + 1}`);
+                    emotions.push(Math.random() * 0.5 + 0.3); // Placeholder
+                }
+            });
+            
+            // If no data, show placeholder
+            if (emotions.length === 0) {
+                labels.push('No data');
+                emotions.push(0);
+            }
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Engagement Level',
+                        data: emotions,
+                        borderColor: '#3182ce',
+                        backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#718096'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#718096'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showError() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ==================== Initialize ====================
+        document.addEventListener('DOMContentLoaded', loadReport);
+    </script>
+</body>
+</html>

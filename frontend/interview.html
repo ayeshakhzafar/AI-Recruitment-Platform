@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview - RECRUTO</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Load face-api.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</head>
+<body>
+    <!-- Face Verification Modal (shows before interview starts) -->
+    <div id="verification-modal" class="verification-modal hidden">
+        <div class="verification-content">
+            <h2>Verify Your Identity</h2>
+            <p>Please position your face in the camera and take a photo to verify your identity before starting the interview.</p>
+            
+            <div class="verification-video-container">
+                <video id="verify-webcam" autoplay playsinline muted></video>
+            </div>
+            
+            <button id="capture-verify-btn" class="capture-button">
+                <span>📸</span> Capture & Verify
+            </button>
+            
+            <div id="verification-status" class="verification-status hidden">
+                <div class="spinner"></div>
+                <span>Verifying...</span>
+            </div>
+            
+            <div id="verification-result" class="verification-result hidden">
+                <div class="result-icon"></div>
+                <p class="result-message"></p>
+                <button id="proceed-btn" class="proceed-button hidden">Start Interview</button>
+                <button id="retry-btn" class="retry-button hidden">Try Again</button>
+            </div>
+            
+            <button id="skip-verification" class="skip-button">Skip Verification</button>
+        </div>
+    </div>
+
+    <!-- Face Alert Banner -->
+    <div id="face-alert-banner" class="face-alert-banner hidden">
+        <span class="alert-icon">⚠️</span>
+        <span>Face mismatch detected! Please ensure you are the registered candidate.</span>
+    </div>
+
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="candidate-info">
+                <h1 class="candidate-name">John Doe</h1>
+                <span class="job-role">Software Engineer</span>
+            </div>
+            <div class="session-info">
+                <div class="face-status verified" id="face-status">
+                    <span class="status-dot"></span>
+                    <span>Verified</span>
+                </div>
+                <div class="session-timer" id="session-timer">00:00</div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel - Video Feed -->
+            <section class="video-panel">
+                <div class="video-container">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <canvas id="overlay"></canvas>
+                    
+                    <!-- Emotion Badge -->
+                    <div class="emotion-badge" id="emotion-badge">
+                        <span class="emotion-emoji">😐</span>
+                        <span class="emotion-text">Neutral</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel - Chat Transcript -->
+            <aside class="chat-panel">
+                <div class="chat-header">
+                    <h2>Interview Transcript</h2>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message assistant">
+                        <div class="message-content">
+                            Hello! I'm your AI interviewer today. Let's begin. Please tell me about yourself.
+                        </div>
+                        <div class="message-time">00:00</div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Bottom Bar -->
+        <footer class="bottom-bar">
+            <div class="controls">
+                <button id="mic-button" class="mic-button" title="Push to Talk">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                    <span>Hold to Talk</span>
+                </button>
+                
+                <div class="status-indicator" id="status-indicator">
+                    <span class="status-icon idle"></span>
+                    <span class="status-text">Ready</span>
+                </div>
+            </div>
+            
+            <div class="interview-controls">
+                <button id="end-interview" class="end-button">End Interview</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Interview Complete Modal -->
+    <div id="interview-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Interview Complete</h2>
+            <div class="score-display">
+                <div class="score-value" id="final-score">8.5</div>
+                <div class="score-label">Overall Score</div>
+            </div>
+            <div class="report-section">
+                <h3>Strengths</h3>
+                <ul id="strengths-list"></ul>
+            </div>
+            <div class="report-section">
+                <h3>Areas for Improvement</h3>
+                <ul id="concerns-list"></ul>
+            </div>
+            <div class="report-section">
+                <h3>Recommendation</h3>
+                <p id="recommendation-text" class="recommendation"></p>
+            </div>
+            <button id="close-modal" class="close-modal-button">Close</button>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="interview.js"></script>
+</body>
+</html>

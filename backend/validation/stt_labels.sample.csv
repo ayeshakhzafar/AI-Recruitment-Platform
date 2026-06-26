@@ -1,0 +1,4 @@
+sample_id,reference_text,predicted_text
+s001,"my name is badar and i am a software engineering student","my name is badar and i am software engineering student"
+s002,"i have experience in python fastapi and react","i have experience in python fast api and react"
+s003,"my final year project focuses on ai interview analysis","my final year project focus on ai interview analysis"

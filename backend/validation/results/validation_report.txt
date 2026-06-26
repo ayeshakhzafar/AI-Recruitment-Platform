@@ -1,0 +1,16 @@
+Interview System Validation Report
+====================================
+
+Face Verification:
+- Samples: 5
+- Confusion Matrix: TP=2, TN=1, FP=1, FN=1
+- Accuracy: 0.6000
+- Precision: 0.6667
+- Recall: 0.6667
+- Specificity: 0.5000
+- F1-Score: 0.6667
+
+Answer Recording (STT):
+- Samples: 3
+- WER: 0.1429
+- CER: 0.0323

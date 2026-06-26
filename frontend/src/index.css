@@ -1,0 +1,7 @@
+/* Minimal styles using Tailwind-like classes aren't required.
+You can add Tailwind later. This provides basic layout. */
+body { font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; background: #f3f4f6; margin:0; padding:0; }
+html[data-theme="dark"] body {
+  background: #0f172a;
+  color: #e2e8f0;
+}

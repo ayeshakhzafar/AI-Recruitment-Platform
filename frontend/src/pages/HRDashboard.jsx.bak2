@@ -1,0 +1,3009 @@
+import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
+import CvUpload from "../components/CvUpload";
+import HRDashboardOverview from "./HRDashboardOverview";
+import AIInterviewHRSection from "./AIInterviewHRSection";
+import CandidateStagesResults from "./CandidateStagesResults";
+import JobPostingPage from "./JobPostingPage";
+
+/** Avoid strict mismatch between <select> string values and API number/string ids */
+function sameId(a, b) {
+  return String(a ?? "") === String(b ?? "");
+}
+
+function normalizeCandidateId(id) {
+  if (id == null) return "";
+  return String(id).trim();
+}
+
+// Module icons
+const MODULE_ICONS = {
+  cv: "📄",
+  assessments: "📝",
+  coding: "💻",
+  interviews: "🎤",
+  results: "🏆",
+  job_posting: "💼"
+};
+
+// Module configurations
+const MODULES = [
+  {
+    id: "overview",
+    name: "Dashboard",
+    icon: "📊",
+    description: "Funnel metrics, charts, and recent activity",
+    status: "active",
+  },
+  {
+    id: "job_posting",
+    name: "Job Posting",
+    icon: MODULE_ICONS.job_posting,
+    description: "Create and manage automated job postings",
+    status: "active"
+  },
+  {
+    id: "cv",
+    name: "CV Processing",
+    icon: MODULE_ICONS.cv,
+    description: "Upload, manage and process candidate CVs",
+    status: "active"
+  },
+  {
+    id: "assessments",
+    name: "Technical Assessment",
+    icon: MODULE_ICONS.assessments,
+    description: "Create assessments and send to candidates",
+    status: "active"
+  },
+  {
+    id: "coding",
+    name: "Coding Challenges",
+    icon: MODULE_ICONS.coding,
+    description: "Technical coding evaluations",
+    status: "active"
+  },
+  {
+    id: "interviews",
+    name: "Interviews",
+    icon: MODULE_ICONS.interviews,
+    description: "AI interview sessions and HR reports",
+    status: "active"
+  },
+  {
+    id: "results",
+    name: "Results",
+    icon: MODULE_ICONS.results,
+    description: "Assessment, coding, and AI interview — by candidate email",
+    status: "active"
+  }
+];
+
+export default function HRDashboard() {
+  const [activeModule, setActiveModule] = useState("overview");
+  const [aiInterviewSessionsRefreshKey, setAiInterviewSessionsRefreshKey] = useState(0);
+  const [headerSearch, setHeaderSearch] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [minMatchFilter, setMinMatchFilter] = useState(0);
+  const [selectedCandidates, setSelectedCandidates] = useState([]);
+  const [approvedCandidates, setApprovedCandidates] = useState([]);
+  const [viewCandidate, setViewCandidate] = useState(null);
+  const [assessments, setAssessments] = useState([]);
+  const [selectedAssessment, setSelectedAssessment] = useState(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [emailSelectedCandidates, setEmailSelectedCandidates] = useState([]);
+  const [newAssessment, setNewAssessment] = useState({
+    role: "",
+    difficulty: "medium",
+    duration_minutes: 30,
+    max_questions: 20,
+  });
+  const [creatingAssessment, setCreatingAssessment] = useState(false);
+  const [stats, setStats] = useState({ total: 0, activeModules: 2, totalModules: 5 });
+  const [testResults, setTestResults] = useState([]);
+  const [passingThreshold, setPassingThreshold] = useState(60);
+  const [codingThreshold, setCodingThreshold] = useState(60);
+  const [codingThresholdInput, setCodingThresholdInput] = useState(60);
+
+  useEffect(() => {
+    fetchCandidates();
+    fetchApprovedCandidates();
+    fetchAssessments();
+    fetchTestResults();
+  }, []);
+
+  /** Pre-select every approved candidate so Send is usable without hunting for checkboxes first */
+  useEffect(() => {
+    setEmailSelectedCandidates(
+      approvedCandidates
+        .map((c) => normalizeCandidateId(c.candidate_id))
+        .filter(Boolean)
+    );
+  }, [approvedCandidates]);
+
+  const fetchCandidates = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("http://localhost:8000/api/cv/candidates");
+      const data = await res.json();
+      setCandidates(data.candidates || []);
+    } catch (err) {
+      console.error("Failed to fetch candidates:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchApprovedCandidates = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/hr/approved-candidates");
+      if (res.ok) {
+        const data = await res.json();
+        setApprovedCandidates(data.candidates || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch approved candidates:", err);
+    }
+  };
+
+  const fetchAssessments = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/hr/available-assessments");
+      if (res.ok) {
+        const data = await res.json();
+        setAssessments(data.assessments || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch assessments:", err);
+    }
+  };
+
+  const fetchTestResults = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/results");
+      if (res.ok) {
+        const data = await res.json();
+        setTestResults(data.results || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch test results:", err);
+    }
+  };
+
+  const fetchCandidateDetails = async (candidateId) => {
+    const id = candidateId != null && candidateId !== "" ? String(candidateId).trim() : "";
+    if (!id) {
+      console.warn("fetchCandidateDetails: missing candidate_id");
+      return;
+    }
+    try {
+      const res = await fetch(`http://localhost:8000/api/cv/candidate/${encodeURIComponent(id)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setViewCandidate(data.candidate);
+      }
+    } catch (err) {
+      console.error("Failed to fetch candidate details:", err);
+      alert("Failed to load candidate details");
+    }
+  };
+
+  const handleDeleteCandidate = async (candidateId) => {
+    const id = candidateId != null && candidateId !== "" ? String(candidateId).trim() : "";
+    if (!id) return;
+    if (!confirm("Are you sure you want to delete this candidate? This action cannot be undone.")) return;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/cv/candidate/${encodeURIComponent(id)}`, {
+        method: "DELETE"
+      });
+
+      if (res.ok) {
+        alert("Candidate deleted successfully!");
+        fetchCandidates();
+        setViewCandidate(null);
+      } else {
+        alert("Failed to delete candidate");
+      }
+    } catch (err) {
+      console.error("Error deleting candidate:", err);
+      alert("Failed to delete candidate");
+    }
+  };
+
+  const toggleSelectCandidate = (candidateId) => {
+    setSelectedCandidates(prev => 
+      prev.includes(candidateId) ? prev.filter(id => id !== candidateId) : [...prev, candidateId]
+    );
+  };
+
+  const selectAllCandidates = () => {
+    if (selectedCandidates.length === filteredCandidates.length) {
+      setSelectedCandidates([]);
+    } else {
+      setSelectedCandidates(filteredCandidates.map(c => c.candidate_id));
+    }
+  };
+
+  const approveSelectedCandidates = async () => {
+    if (selectedCandidates.length === 0) {
+      alert("Please select candidates to approve");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:8000/api/hr/approve-candidates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidate_ids: selectedCandidates })
+      });
+
+      if (res.ok) {
+        alert(`✅ ${selectedCandidates.length} candidate(s) approved for technical assessment!`);
+        setSelectedCandidates([]);
+        fetchApprovedCandidates();
+        fetchCandidates();
+      } else {
+        const error = await res.json();
+        alert(`❌ Failed: ${error.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error approving candidates:", err);
+      alert("Failed to approve candidates");
+    }
+  };
+
+  const removeFromAssessment = async (candidateId) => {
+    if (!confirm("Remove this candidate from assessment?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/hr/remove-assessment/${candidateId}`, {
+        method: "DELETE"
+      });
+
+      if (res.ok) {
+        alert("Candidate removed from assessment");
+        fetchApprovedCandidates();
+      }
+    } catch (err) {
+      console.error("Error removing candidate:", err);
+      alert("Failed to remove candidate");
+    }
+  };
+
+  const createNewAssessment = async () => {
+    if (!newAssessment.role.trim()) {
+      alert("Please enter a role/title for the assessment");
+      return;
+    }
+
+    try {
+      setCreatingAssessment(true);
+      const res = await fetch("http://localhost:8000/api/mcq/generate-adaptive-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: newAssessment.role.trim(),
+          max_questions: Math.min(
+            100,
+            Math.max(1, parseInt(String(newAssessment.max_questions), 10) || 20)
+          ),
+          duration_minutes: newAssessment.duration_minutes,
+          difficulty: newAssessment.difficulty,
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ Assessment created: ${data.role}`);
+        setShowCreateModal(false);
+        setNewAssessment({
+          role: "",
+          difficulty: "medium",
+          duration_minutes: 30,
+          max_questions: 20,
+        });
+        fetchAssessments();
+        setSelectedAssessment({
+          assessment_id: data.assessment_id,
+          role: data.role,
+          questions_count: data.max_questions,
+          status: "draft",
+        });
+      } else {
+        alert(`❌ Failed: ${data.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error creating assessment:", err);
+      alert("Failed to create assessment");
+    } finally {
+      setCreatingAssessment(false);
+    }
+  };
+
+  const toggleEmailCandidate = (candidateId) => {
+    const id = normalizeCandidateId(candidateId);
+    if (!id) return;
+    setEmailSelectedCandidates((prev) =>
+      prev.some((x) => sameId(x, id))
+        ? prev.filter((x) => !sameId(x, id))
+        : [...prev, id]
+    );
+  };
+
+  const selectAllEmailCandidates = () => {
+    const all = approvedCandidates
+      .map((c) => normalizeCandidateId(c.candidate_id))
+      .filter(Boolean);
+    if (emailSelectedCandidates.length === all.length && all.length > 0) {
+      setEmailSelectedCandidates([]);
+    } else {
+      setEmailSelectedCandidates(all);
+    }
+  };
+
+  const sendAssessmentEmail = async (candidateIds) => {
+    if (!selectedAssessment) {
+      alert("Please select an assessment first");
+      return;
+    }
+
+    if (candidateIds.length === 0) {
+      alert("Please select candidates to send assessment to");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:8000/api/hr/send-assessment-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assessment_id: selectedAssessment.assessment_id,
+          candidate_ids: candidateIds
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.message}`);
+        setShowEmailModal(false);
+        setEmailSelectedCandidates([]);
+      } else {
+        alert(`❌ Failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error sending assessment email:", err);
+      alert("Failed to send assessment email");
+    }
+  };
+
+  const filteredCandidates = candidates.filter(c => {
+    const matchesSearch = 
+      !searchTerm || 
+      c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.skills?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesMinMatch = (c.skill_match_percentage || 0) >= minMatchFilter;
+    
+    return matchesSearch && matchesMinMatch;
+  });
+
+  const renderModuleContent = () => {
+    switch (activeModule) {
+      case "overview":
+        return (
+          <HRDashboardOverview
+            candidates={candidates}
+            approvedCandidates={approvedCandidates}
+            assessments={assessments}
+            testResults={testResults}
+            passingThreshold={passingThreshold}
+            userName="HR team"
+            onGoToModule={(id) => setActiveModule(id)}
+          />
+        );
+      case "job_posting":
+        return (
+          <div style={{ margin: "-24px -32px" }}>
+            <JobPostingPage />
+          </div>
+        );
+      case "cv":
+        return <CVProcessingModule 
+          candidates={candidates}
+          filteredCandidates={filteredCandidates}
+          loading={loading}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          minMatchFilter={minMatchFilter}
+          setMinMatchFilter={setMinMatchFilter}
+          selectedCandidates={selectedCandidates}
+          toggleSelectCandidate={toggleSelectCandidate}
+          selectAllCandidates={selectAllCandidates}
+          approveSelectedCandidates={approveSelectedCandidates}
+          onViewCandidate={fetchCandidateDetails}
+          onDeleteCandidate={handleDeleteCandidate}
+          viewCandidate={viewCandidate}
+          setViewCandidate={setViewCandidate}
+          onRefresh={fetchCandidates}
+        />;
+      case "assessments":
+        return <TechnicalAssessmentModule 
+          approvedCandidates={approvedCandidates}
+          assessments={assessments}
+          selectedAssessment={selectedAssessment}
+          setSelectedAssessment={setSelectedAssessment}
+          removeFromAssessment={removeFromAssessment}
+          sendAssessmentEmail={sendAssessmentEmail}
+          fetchAssessments={fetchAssessments}
+          showEmailModal={showEmailModal}
+          setShowEmailModal={setShowEmailModal}
+          showCreateModal={showCreateModal}
+          setShowCreateModal={setShowCreateModal}
+          newAssessment={newAssessment}
+          setNewAssessment={setNewAssessment}
+          createNewAssessment={createNewAssessment}
+          creatingAssessment={creatingAssessment}
+          emailSelectedCandidates={emailSelectedCandidates}
+          setEmailSelectedCandidates={setEmailSelectedCandidates}
+          toggleEmailCandidate={toggleEmailCandidate}
+          selectAllEmailCandidates={selectAllEmailCandidates}
+          testResults={testResults}
+          passingThreshold={passingThreshold}
+          setPassingThreshold={setPassingThreshold}
+        />;
+      case "coding":
+        return (
+          <div style={{ padding: 24 }}>
+            <CodingChallengesSection 
+              testResults={testResults}
+              passingThreshold={passingThreshold}
+              onManageChallenges={() => window.location.href = '/coding-challenges'}
+              codingThreshold={codingThreshold}
+              onSetCodingThreshold={setCodingThreshold}
+              onInterviewInvitationsSent={() => setAiInterviewSessionsRefreshKey((k) => k + 1)}
+            />
+          </div>
+        );
+      case "interviews":
+        return (
+          <div style={{ padding: 24 }}>
+            <AIInterviewHRSection refreshKey={aiInterviewSessionsRefreshKey} />
+          </div>
+        );
+      case "results":
+        return (
+          <div style={{ padding: 24 }}>
+            <CandidateStagesResults />
+          </div>
+        );
+      default:
+        return <CVProcessingModule 
+          candidates={candidates}
+          filteredCandidates={filteredCandidates}
+          loading={loading}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          minMatchFilter={minMatchFilter}
+          setMinMatchFilter={setMinMatchFilter}
+          selectedCandidates={selectedCandidates}
+          toggleSelectCandidate={toggleSelectCandidate}
+          selectAllCandidates={selectAllCandidates}
+          approveSelectedCandidates={approveSelectedCandidates}
+          onViewCandidate={fetchCandidateDetails}
+          onDeleteCandidate={handleDeleteCandidate}
+          viewCandidate={viewCandidate}
+          setViewCandidate={setViewCandidate}
+          onRefresh={fetchCandidates}
+        />;
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: "#fafafa" }}>
+      {/* Sidebar — deep navy (Lagos-style) */}
+      <div
+        style={{
+          width: 268,
+          background: "#000000",
+          padding: "28px 14px",
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          position: "sticky",
+          top: 0,
+          boxShadow: "8px 0 32px rgba(30, 27, 75, 0.15)",
+        }}
+      >
+        <div style={{ marginBottom: 28, padding: "0 10px" }}>
+          <h2
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: "#fff",
+              margin: 0,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Recruto
+          </h2>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 6, marginBottom: 0 }}>
+            HR · Recruitment
+          </p>
+        </div>
+
+        <nav style={{ flex: 1, overflowY: "auto" }}>
+          <div
+            style={{
+              marginBottom: 10,
+              padding: "0 12px",
+              fontSize: 10,
+              fontWeight: 700,
+              color: "rgba(255,255,255,0.35)",
+              textTransform: "uppercase",
+              letterSpacing: "0.12em",
+            }}
+          >
+            Applications
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {MODULES.map((module) => {
+              const isActive = activeModule === module.id;
+              const isPlaceholder = module.status === "placeholder";
+
+              return (
+                <button
+                  key={module.id}
+                  onClick={() => !isPlaceholder && setActiveModule(module.id)}
+                  disabled={isPlaceholder}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 14px",
+                    background: isActive ? "rgba(255, 255, 255, 0.15)" : "transparent",
+                    border: isActive ? "1px solid rgba(236, 72, 153, 0.35)" : "1px solid transparent",
+                    borderRadius: 12,
+                    cursor: isPlaceholder ? "not-allowed" : "pointer",
+                    textAlign: "left",
+                    width: "100%",
+                    opacity: isPlaceholder ? 0.45 : 1,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>{module.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: isActive ? 700 : 500,
+                        color: "#fff",
+                      }}
+                    >
+                      {module.name}
+                    </div>
+                    {isPlaceholder && (
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
+                        Coming soon
+                      </div>
+                    )}
+                  </div>
+                  {isPlaceholder && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        padding: "2px 6px",
+                        background: "rgba(255,255,255,0.1)",
+                        borderRadius: 4,
+                        color: "rgba(255,255,255,0.5)",
+                      }}
+                    >
+                      🔒
+                    </span>
+                  )}
+                  {module.id === "assessments" && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "3px 8px",
+                        background: "rgba(20, 184, 166, 0.25)",
+                        borderRadius: 8,
+                        color: "#5eead4",
+                      }}
+                    >
+                      {approvedCandidates.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        <div
+          style={{
+            padding: 16,
+            background: "rgba(0,0,0,0.2)",
+            borderRadius: 14,
+            marginTop: 12,
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: "rgba(255,255,255,0.4)",
+              marginBottom: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+            }}
+          >
+            Snapshot
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "rgba(255,255,255,0.55)" }}>Candidates</span>
+              <span style={{ fontWeight: 700, color: "#fff" }}>{candidates.length}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: "rgba(255,255,255,0.55)" }}>In pipeline</span>
+              <span style={{ fontWeight: 700, color: "#000" }}>{approvedCandidates.length}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+        {/* Top bar */}
+        <header
+          style={{
+            padding: "18px 32px",
+            background: "#fff",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+            flexWrap: "wrap",
+            boxShadow: "0 4px 20px rgba(15, 23, 42, 0.04)",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 200, maxWidth: 420 }}>
+            <input
+              type="search"
+              placeholder="Search here… (switch to CV module to filter list)"
+              value={headerSearch}
+              onChange={(e) => setHeaderSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && headerSearch.trim()) {
+                  setSearchTerm(headerSearch.trim());
+                  setActiveModule("cv");
+                }
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 16px 12px 40px",
+                borderRadius: 12,
+                border: "1px solid #e2e8f0",
+                fontSize: 14,
+                background: "#f8fafc",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginLeft: "auto" }}>
+            <Link
+              to="/notifications"
+              style={{ fontSize: 20, opacity: 0.85, textDecoration: "none" }}
+              title="Notifications (Module 2.2.12)"
+            >
+              🔔
+            </Link>
+            <Link
+              to="/settings"
+              style={{ fontSize: 20, opacity: 0.85, textDecoration: "none" }}
+              title="System settings (Module 2.2.13)"
+            >
+              ⚙️
+            </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  background: "#000000",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: 14,
+                }}
+              >
+                HR
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>HR Admin</div>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>Recruitment</div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div style={{ padding: "24px 32px 40px", flex: 1 }}>
+          {activeModule !== "overview" && (
+            <div style={{ marginBottom: 22 }}>
+              <h1
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  margin: 0,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {MODULES.find((m) => m.id === activeModule)?.name || "Dashboard"}
+              </h1>
+              <p style={{ color: "#64748b", fontSize: 14, marginTop: 6, marginBottom: 0 }}>
+                {MODULES.find((m) => m.id === activeModule)?.description}
+              </p>
+            </div>
+          )}
+          {renderModuleContent()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// CV Processing Module
+function CVProcessingModule({ 
+  candidates, filteredCandidates, loading, 
+  searchTerm, setSearchTerm, minMatchFilter, setMinMatchFilter,
+  selectedCandidates, toggleSelectCandidate, selectAllCandidates,
+  approveSelectedCandidates, onViewCandidate, onDeleteCandidate,
+  viewCandidate, setViewCandidate, onRefresh
+}) {
+  const [fetchingPortal, setFetchingPortal] = useState(false);
+  const [activeJobs, setActiveJobs] = useState([]);
+
+  useEffect(() => {
+    const fetchActiveJobs = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/cv/job-postings?status=active");
+        if (res.ok) {
+          const data = await res.json();
+          setActiveJobs(data.job_postings || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch active jobs for CV Upload:", err);
+      }
+    };
+    fetchActiveJobs();
+  }, []);
+
+  const handleFetchPortal = async () => {
+    setFetchingPortal(true);
+    try {
+      const token = localStorage.getItem("recruto_token");
+      const res = await fetch("http://localhost:8000/api/hr/fetch-portal-cvs", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || "CVs fetched successfully");
+        if (onRefresh) onRefresh();
+      } else {
+        alert("Error fetching portal CVs: " + (data.detail || "Unknown error"));
+      }
+    } catch (e) {
+      alert("Network error while fetching portal CVs.");
+    } finally {
+      setFetchingPortal(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* CV Upload Section */}
+      <div style={{
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        padding: 24,
+        marginBottom: 24
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111", margin: 0 }}>
+            📥 Import CVs
+          </h3>
+          <button
+            onClick={handleFetchPortal}
+            disabled={fetchingPortal}
+            style={{
+              padding: "8px 16px",
+              background: fetchingPortal ? "#9ca3af" : "#000000",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontWeight: 600,
+              cursor: fetchingPortal ? "not-allowed" : "pointer"
+            }}
+          >
+            {fetchingPortal ? "Fetching..." : "Fetch CVs from Candidate Portal"}
+          </button>
+        </div>
+        <CvUpload jobPostings={activeJobs} onUploadSuccess={onRefresh} />
+      </div>
+
+      {/* Search and Filter */}
+      <div style={{
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        padding: 24,
+        marginBottom: 24
+      }}>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111", margin: "0 0 16px 0" }}>
+          🔍 Search Candidates
+        </h3>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="Search by name, email, or skills..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              padding: "12px 16px",
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              fontSize: 14,
+              width: 300,
+              outline: "none"
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 14, color: "#6b7280" }}>Min Match %:</label>
+            <select
+              value={minMatchFilter}
+              onChange={(e) => setMinMatchFilter(Number(e.target.value))}
+              style={{
+                padding: "12px 16px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 8,
+                fontSize: 14,
+                outline: "none"
+              }}
+            >
+              <option value={0}>All</option>
+              <option value={50}>50%+</option>
+              <option value={60}>60%+</option>
+              <option value={70}>70%+</option>
+              <option value={80}>80%+</option>
+            </select>
+          </div>
+          {selectedCandidates.length > 0 && (
+            <button
+              onClick={approveSelectedCandidates}
+              style={{
+                padding: "12px 24px",
+                background: "#10b981",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginLeft: "auto"
+              }}
+            >
+              ✅ Approve {selectedCandidates.length} for Assessment
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Candidates Table */}
+      <div style={{
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        overflow: "hidden"
+      }}>
+        <div style={{ 
+          padding: "20px 24px", 
+          borderBottom: "1px solid #e5e7eb",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111", margin: 0 }}>
+            📋 Candidates ({filteredCandidates.length})
+          </h3>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+            Loading candidates...
+          </div>
+        ) : filteredCandidates.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+            <div>No candidates found</div>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedCandidates.length === filteredCandidates.length && filteredCandidates.length > 0}
+                      onChange={selectAllCandidates}
+                    />
+                  </th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Name</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Email</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Skills</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Matched Skills</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Status</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Source</th>
+                  <th style={{ padding: "12px 16px", textAlign: "center", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCandidates.map((candidate) => {
+                  const matchPercent = candidate.skill_match_percentage || 0;
+                  const matchColor = matchPercent >= 80 ? "#10b981" : matchPercent >= 60 ? "#f59e0b" : "#ef4444";
+                  
+                  return (
+                    <tr 
+                      key={candidate.candidate_id} 
+                      style={{ 
+                        borderBottom: "1px solid #e5e7eb",
+                        background: selectedCandidates.includes(candidate.candidate_id) ? "#f0f9ff" : "#fff"
+                      }}
+                    >
+                      <td style={{ padding: "12px 16px" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedCandidates.includes(candidate.candidate_id)}
+                          onChange={() => toggleSelectCandidate(candidate.candidate_id)}
+                        />
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ fontWeight: 500, color: "#111" }}>{candidate.name || "N/A"}</div>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ color: "#6b7280", fontSize: 14 }}>{candidate.email}</div>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {candidate.skills?.slice(0, 3).map((skill, i) => (
+                            <span 
+                              key={i} 
+                              style={{ 
+                                padding: "2px 8px", 
+                                background: "#f3f4f6", 
+                                borderRadius: 4, 
+                                fontSize: 12,
+                                color: "#4b5563"
+                              }}
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                          {candidate.skills?.length > 3 && (
+                            <span style={{ fontSize: 12, color: "#9ca3af" }}>+{candidate.skills.length - 3}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {(() => {
+                            if (!candidate.job_id) return <span style={{ fontSize: 12, color: "#9ca3af" }}>No Job assigned</span>;
+                            if (!candidate.extra_skills) return <span style={{ fontSize: 12, color: "#9ca3af" }}>Not mapped</span>;
+
+                            const matchedSkills = (candidate.skills || []).filter(s => !(candidate.extra_skills || []).includes(s.toLowerCase()));
+
+                            if (matchedSkills.length === 0) return <span style={{ fontSize: 12, color: "#ef4444" }}>0% Match</span>;
+
+                            return (
+                              <>
+                                {matchedSkills.slice(0, 3).map((skill, i) => (
+                                  <span key={i} style={{ padding: "2px 8px", background: "#dcfce7", color: "#166534", borderRadius: 4, fontSize: 12 }}>
+                                    {skill}
+                                  </span>
+                                ))}
+                                {matchedSkills.length > 3 && (
+                                  <span style={{ fontSize: 12, color: "#9ca3af" }}>+{matchedSkills.length - 3}</span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{
+                          padding: "4px 12px",
+                          background: candidate.status === "processed" ? "#dcfce7" : candidate.status === "approved_for_assessment" ? "#f3f4f6" : "#fef3c7",
+                          color: candidate.status === "processed" ? "#166534" : candidate.status === "approved_for_assessment" ? "#111111" : "#92400e",
+                          borderRadius: 12,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          textTransform: "capitalize"
+                        }}>
+                          {candidate.status === "approved_for_assessment" ? "Approved" : candidate.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{ fontSize: 12, color: "#6b7280" }}>
+                          {candidate.cv_source === "gmail" ? "📧 Gmail" : "📁 Upload"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                        <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+                          <button
+                            onClick={() => onViewCandidate(candidate.candidate_id)}
+                            style={{
+                              padding: "8px 12px",
+                              background: "#f3f4f6",
+                              color: "#333333",
+                              border: "none",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              fontSize: 14,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4
+                            }}
+                            title="View Details"
+                          >
+                            👁️
+                          </button>
+                          <button
+                            onClick={() => onDeleteCandidate(candidate.candidate_id)}
+                            style={{
+                              padding: "8px 12px",
+                              background: "#fee2e2",
+                              color: "#991b1b",
+                              border: "none",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              fontSize: 14,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4
+                            }}
+                            title="Delete"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Candidate Detail Modal */}
+      {viewCandidate && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "#fff",
+            borderRadius: 16,
+            width: "90%",
+            maxWidth: 700,
+            maxHeight: "85vh",
+            overflow: "auto",
+            padding: 24
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 24 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>{viewCandidate.name || "No Name"}</h2>
+                <p style={{ margin: "4px 0 0 0", color: "#6b7280" }}>{viewCandidate.email}</p>
+              </div>
+              <button
+                onClick={() => setViewCandidate(null)}
+                style={{
+                  padding: 8,
+                  background: "#f3f4f6",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontSize: 18
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>Phone</div>
+                  <div style={{ fontSize: 14, color: "#111" }}>{viewCandidate.phone || "Not provided"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>Role</div>
+                  <div style={{ fontSize: 14, color: "#111", fontWeight: 500 }}>{viewCandidate.role || "Not specified"}</div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 8 }}>Experience</div>
+                <div style={{ fontSize: 14, color: "#333", background: "#f9fafb", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", whiteSpace: "pre-wrap", maxHeight: 200, overflowY: "auto" }}>
+                  {(() => {
+                    const formatExp = (expArray) => {
+                      if (!Array.isArray(expArray) || expArray.length === 0) return "No experience details found.";
+                      return expArray.map(e => {
+                        if (typeof e === 'string') return e;
+                        let header = "";
+                        if (e.title) header += e.title;
+                        if (e.company) header += (header ? " at " : "") + e.company;
+                        
+                        let text = header ? `**${header}**\n` : "";
+                        if (e.duration) text += `--- ${e.duration} ---\n`;
+                        if (e.description) text += `${e.description}\n`;
+                        return text.trim();
+                      }).join("\n\n");
+                    };
+
+                    if (!viewCandidate.experience) return "No experience details found.";
+                    if (Array.isArray(viewCandidate.experience)) {
+                      return formatExp(viewCandidate.experience);
+                    }
+                    if (typeof viewCandidate.experience === "string") {
+                      try {
+                        const parsed = JSON.parse(viewCandidate.experience);
+                        return formatExp(parsed);
+                      } catch (e) {
+                        return viewCandidate.experience;
+                      }
+                    }
+                    return "No experience details found.";
+                  })()}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 8 }}>Matched Skills</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {viewCandidate.skills?.length > 0 ? (
+                    viewCandidate.skills.map((skill, i) => (
+                      <span key={i} style={{ padding: "6px 12px", background: "#f3f4f6", borderRadius: 16, fontSize: 13, color: "#333333" }}>
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{ color: "#9ca3af" }}>No skills extracted</span>
+                  )}
+                </div>
+              </div>
+
+              {viewCandidate.missing_skills && viewCandidate.missing_skills.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 8 }}>Missing Skills (Required by Job)</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {viewCandidate.missing_skills.map((skill, i) => (
+                      <span key={i} style={{ padding: "6px 12px", background: "#fee2e2", borderRadius: 16, fontSize: 13, color: "#991b1b" }}>
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {viewCandidate.extra_skills && viewCandidate.extra_skills.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 8 }}>Extra Skills</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {viewCandidate.extra_skills.map((skill, i) => (
+                      <span key={i} style={{ padding: "6px 12px", background: "#dcfce7", borderRadius: 16, fontSize: 13, color: "#166534" }}>
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>Job Match</div>
+                  <span style={{ padding: "8px 16px", background: (viewCandidate.skill_match_percentage || 0) >= 70 ? "#dcfce7" : "#fef3c7", color: (viewCandidate.skill_match_percentage || 0) >= 70 ? "#166534" : "#92400e", borderRadius: 12, fontSize: 16, fontWeight: 700 }}>
+                    {viewCandidate.skill_match_percentage || 0}%
+                  </span>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>Source</div>
+                  <span style={{ fontSize: 14, color: "#111" }}>
+                    {viewCandidate.cv_source === "gmail" ? "📧 Gmail" : "📁 Upload"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => { onDeleteCandidate(viewCandidate.candidate_id); setViewCandidate(null); }}
+                style={{ padding: "10px 20px", background: "#fee2e2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#991b1b" }}
+              >
+                🗑️ Delete
+              </button>
+              <button
+                onClick={() => setViewCandidate(null)}
+                style={{ padding: "10px 20px", background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#4b5563" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Technical Assessment Module
+function TechnicalAssessmentModule({ 
+  approvedCandidates, assessments, selectedAssessment, 
+  setSelectedAssessment, removeFromAssessment, sendAssessmentEmail, fetchAssessments,
+  showEmailModal, setShowEmailModal, showCreateModal, setShowCreateModal,
+  newAssessment, setNewAssessment, createNewAssessment, creatingAssessment,
+  emailSelectedCandidates, setEmailSelectedCandidates, toggleEmailCandidate, selectAllEmailCandidates,
+  testResults, passingThreshold, setPassingThreshold
+}) {
+  const openSendAssessmentModal = () => {
+    if (!selectedAssessment) {
+      alert("Select an assessment from the dropdown first.");
+      return;
+    }
+    if (!approvedCandidates.length) {
+      alert("No approved candidates yet. Approve candidates from the CV module first.");
+      return;
+    }
+    if (!emailSelectedCandidates.length) {
+      setEmailSelectedCandidates(
+        approvedCandidates
+          .map((c) => normalizeCandidateId(c.candidate_id))
+          .filter(Boolean)
+      );
+    }
+    setShowEmailModal(true);
+  };
+  return (
+    <div>
+      {/* Create Assessment & Select Assessment Section */}
+      <div style={{
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        padding: 24,
+        marginBottom: 24
+      }}>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111", margin: "0 0 16px 0" }}>
+          📝 Assessment Management
+        </h3>
+        
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              padding: "12px 24px",
+              background: "#10b981",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 8
+            }}
+          >
+            ➕ Create New Assessment
+          </button>
+
+          <button
+            onClick={() => window.location.href = "/results"}
+            style={{
+              padding: "12px 24px",
+              background: "#000",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 8
+            }}
+          >
+            📊 View Results
+          </button>
+
+          <button
+            type="button"
+            onClick={openSendAssessmentModal}
+            disabled={!selectedAssessment || !approvedCandidates.length}
+            title={
+              !selectedAssessment
+                ? "Choose an assessment in the dropdown"
+                : !approvedCandidates.length
+                  ? "Approve candidates from CV Processing first"
+                  : "Open email confirmation (uncheck rows below to exclude anyone)"
+            }
+            style={{
+              padding: "12px 24px",
+              background:
+                selectedAssessment && approvedCandidates.length > 0
+                  ? "#000000"
+                  : "#cbd5e1",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor:
+                selectedAssessment && approvedCandidates.length > 0
+                  ? "pointer"
+                  : "not-allowed",
+              fontSize: 14,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            📧 Send assessment
+            {approvedCandidates.length > 0
+              ? ` (${emailSelectedCandidates.length || approvedCandidates.length})`
+              : ""}
+          </button>
+
+          <div style={{ flex: 1, minWidth: 250 }}>
+            <label style={{ fontSize: 14, color: "#6b7280", marginBottom: 8, display: "block" }}>
+              Select Assessment to Send:
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <select
+                value={
+                  selectedAssessment?.assessment_id != null
+                    ? String(selectedAssessment.assessment_id)
+                    : ""
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const assessment =
+                    assessments.find((a) => sameId(a.assessment_id, v)) || null;
+                  setSelectedAssessment(assessment);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "12px 16px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  outline: "none"
+                }}
+              >
+                {assessments.length === 0 ? (
+                  <option value="">No assessments available - Create one first</option>
+                ) : (
+                  assessments.map(a => (
+                    <option key={a.assessment_id} value={String(a.assessment_id)}>
+                      {a.role} ({a.questions_count} questions) - {a.status}
+                    </option>
+                  ))
+                )}
+              </select>
+              {selectedAssessment && (
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Delete assessment "${selectedAssessment.role}"?`)) return;
+                    try {
+                      const res = await fetch(`/api/mcq/assessment/${selectedAssessment.assessment_id}`, {
+                        method: "DELETE"
+                      });
+                      if (res.ok) {
+                        alert("Assessment deleted!");
+                        setSelectedAssessment(null);
+                        fetchAssessments();
+                      } else {
+                        alert("Failed to delete assessment");
+                      }
+                    } catch (err) {
+                      console.error("Delete error:", err);
+                      alert("Failed to delete assessment");
+                    }
+                  }}
+                  style={{
+                    padding: "12px 16px",
+                    background: "#ef4444",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap"
+                  }}
+                  title="Delete this assessment"
+                >
+                  🗑️ Delete
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Approved Candidates Table with Email Checkboxes */}
+      <div style={{
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        padding: 24,
+        marginBottom: 24
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111", margin: 0 }}>
+            ✅ Approved Candidates
+          </h3>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <span style={{ padding: "4px 12px", background: "#000000", color: "#fff", borderRadius: 12, fontSize: 14, fontWeight: 600 }}>
+              {approvedCandidates.length} candidates
+            </span>
+            <button
+              type="button"
+              onClick={openSendAssessmentModal}
+              disabled={!selectedAssessment || !approvedCandidates.length}
+              style={{
+                padding: "10px 20px",
+                background:
+                  selectedAssessment && approvedCandidates.length > 0
+                    ? "#000000"
+                    : "#cbd5e1",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                cursor:
+                  selectedAssessment && approvedCandidates.length > 0
+                    ? "pointer"
+                    : "not-allowed",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              📧 Send to{" "}
+              {emailSelectedCandidates.length || approvedCandidates.length} selected
+            </button>
+          </div>
+        </div>
+        
+        {/* Test Results Section */}
+        {testResults.length > 0 && (
+          <div style={{ marginBottom: 24, background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h4 style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                📊 Test Results ({testResults.length} candidates)
+              </h4>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <label style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 8 }}>
+                  Passing Threshold:
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="100" 
+                    value={passingThreshold} 
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? 0 : parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 0 && val <= 100) setPassingThreshold(val);
+                    }}
+                    style={{ 
+                      padding: "8px 12px", 
+                      border: "1px solid #e5e7eb", 
+                      borderRadius: 6, 
+                      fontSize: 13, 
+                      width: 70,
+                      textAlign: "center" 
+                    }}
+                  />
+                  <span style={{ color: "#6b7280" }}>%</span>
+                  <button
+                    onClick={() => {}}
+                    style={{
+                      padding: "6px 12px",
+                      background: "#000000",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    Apply
+                  </button>
+                </label>
+                <span style={{ 
+                  padding: "6px 12px", 
+                  background: "#dcfce7", 
+                  color: "#166534", 
+                  borderRadius: 6, 
+                  fontSize: 12, 
+                  fontWeight: 600 
+                }}>
+                  ✓ {testResults.filter(r => (r.score_percentage || r.score || 0) >= passingThreshold).length} Passed
+                </span>
+              </div>
+            </div>
+            
+            {/* Passed Candidates for Coding Test */}
+            {testResults.filter(r => (r.score_percentage || r.score || 0) >= passingThreshold).length > 0 && (
+              <div style={{ marginBottom: 20, padding: 16, background: "#f0fdf4", borderRadius: 8, border: "2px solid #86efac" }}>
+                <h5 style={{ fontSize: 14, fontWeight: 600, color: "#166534", marginBottom: 12 }}>
+                  ✅ Passed Candidates Ready for Coding Test
+                </h5>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {testResults
+                    .filter(r => (r.score_percentage || r.score || 0) >= passingThreshold)
+                    .map((result, idx) => (
+                      <div key={idx} style={{ 
+                        padding: "8px 12px", 
+                        background: "#fff", 
+                        border: "1px solid #86efac", 
+                        borderRadius: 6,
+                        fontSize: 13
+                      }}>
+                        <span style={{ fontWeight: 500, color: "#111" }}>{result.candidate_email || result.email}</span>
+                        <span style={{ marginLeft: 8, fontSize: 12, color: "#10b981" }}>
+                          {(result.score_percentage || result.score || 0).toFixed(0)}%
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+            
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", background: "#f9fafb", borderRadius: 8, overflow: "hidden" }}>
+                <thead>
+                  <tr style={{ background: "#000000", color: "#fff" }}>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600 }}>Candidate Email</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600 }}>Role</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600 }}>Score</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600 }}>Passing</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600 }}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {testResults.map((result, idx) => {
+                    const score = result.score_percentage || result.score || 0;
+                    const passed = score >= passingThreshold;
+                    return (
+                      <tr key={idx} style={{ background: passed ? "#dcfce7" : "#fff", borderBottom: "1px solid #e5e7eb" }}>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#111" }}>{result.candidate_email || result.email}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#111" }}>{result.role}</td>
+                        <td style={{ padding: "12px 16px", fontSize: 14, fontWeight: 700, color: passed ? "#10b981" : "#ef4444" }}>
+                          {score.toFixed(1)}%
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span style={{ 
+                            padding: "4px 12px", 
+                            borderRadius: 6, 
+                            fontSize: 12, 
+                            fontWeight: 600,
+                            background: passed ? "#10b981" : "#ef4444",
+                            color: "#fff"
+                          }}>
+                            {passed ? "✓ PASS" : "✗ FAIL"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#6b7280" }}>
+                          {result.end_time ? new Date(result.end_time).toLocaleDateString() : "N/A"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        
+        {approvedCandidates.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📝</div>
+            <h4 style={{ color: "#374151", marginBottom: 8 }}>No candidates approved yet</h4>
+            <p style={{ fontSize: 14 }}>Go to CV Processing module and approve candidates to see them here</p>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+                    <input 
+                      type="checkbox" 
+                      checked={emailSelectedCandidates.length === approvedCandidates.length && approvedCandidates.length > 0}
+                      onChange={selectAllEmailCandidates}
+                    />
+                  </th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Name</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Email</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Skills</th>
+                  <th style={{ padding: "12px 16px", textAlign: "center", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Match %</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Approved Date</th>
+                  <th style={{ padding: "12px 16px", textAlign: "center", fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvedCandidates.map((candidate) => (
+                  <tr 
+                    key={candidate.candidate_id} 
+                    style={{ 
+                      borderBottom: "1px solid #e5e7eb",
+                      background: emailSelectedCandidates.some((id) => sameId(id, candidate.candidate_id))
+                        ? "#f0f9ff"
+                        : "#fff"
+                    }}
+                  >
+                    <td style={{ padding: "12px 16px" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={emailSelectedCandidates.some((id) =>
+                          sameId(id, candidate.candidate_id)
+                        )}
+                        onChange={() => toggleEmailCandidate(candidate.candidate_id)}
+                      />
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ fontWeight: 500, color: "#111" }}>{candidate.name || "N/A"}</div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ color: "#6b7280", fontSize: 14 }}>{candidate.email}</div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {candidate.skills?.slice(0, 4).map((skill, i) => (
+                          <span key={i} style={{ padding: "2px 8px", background: "#f3f4f6", borderRadius: 4, fontSize: 12, color: "#333333" }}>
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                      <span style={{ padding: "4px 12px", background: "#10b98120", color: "#10b981", borderRadius: 12, fontSize: 14, fontWeight: 600 }}>
+                        {candidate.skill_match_percentage || 0}%
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ fontSize: 14, color: "#6b7280" }}>
+                        {candidate.approved_at ? new Date(candidate.approved_at).toLocaleDateString() : "N/A"}
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                      <button
+                        onClick={() => removeFromAssessment(candidate.candidate_id)}
+                        style={{
+                          padding: "6px 12px",
+                          background: "#fee2e2",
+                          color: "#991b1b",
+                          border: "none",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontWeight: 500
+                        }}
+                      >
+                        ❌ Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Info Card */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.05)", padding: 24 }}>
+        <h4 style={{ color: "#111", marginBottom: 12 }}>💡 How it works</h4>
+        <ul style={{ color: "#6b7280", fontSize: 14, lineHeight: 2, margin: 0, paddingLeft: 20 }}>
+          <li>Click "Create New Assessment" to generate a new technical assessment</li>
+          <li>Select an assessment from the dropdown to send</li>
+          <li>In the candidates table, check the checkbox for candidates you want to send the assessment to</li>
+          <li>Click "Send to X Selected" to email only those selected candidates</li>
+          <li>Candidates will receive an email with a unique assessment link</li>
+        </ul>
+      </div>
+
+      {/* Create Assessment Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "90%", maxWidth: 500, padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>➕ Create New Assessment</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 18 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ fontSize: 14, color: "#6b7280", marginBottom: 8, display: "block" }}>
+                Assessment Title/Role *
+              </label>
+              <input
+                type="text"
+                placeholder="e.g., Software Engineer Assessment"
+                value={newAssessment.role}
+                onChange={(e) => setNewAssessment({...newAssessment, role: e.target.value})}
+                style={{ padding: "12px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, width: "100%", outline: "none" }}
+              />
+              <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+                AI will generate questions based on this role
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ fontSize: 14, color: "#6b7280", marginBottom: 8, display: "block" }}>
+                Number of MCQs *
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={newAssessment.max_questions}
+                onChange={(e) =>
+                  setNewAssessment({
+                    ...newAssessment,
+                    max_questions: parseInt(e.target.value, 10) || 1,
+                  })
+                }
+                style={{ padding: "12px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, width: "100%", outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+                Adaptive test stops after this many questions (max 100).
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 14, color: "#6b7280", marginBottom: 8, display: "block" }}>
+                  Difficulty
+                </label>
+                <select
+                  value={newAssessment.difficulty}
+                  onChange={(e) => setNewAssessment({...newAssessment, difficulty: e.target.value})}
+                  style={{ padding: "12px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, width: "100%", outline: "none" }}
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                  <option value="adaptive">Adaptive (Recommended)</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 14, color: "#6b7280", marginBottom: 8, display: "block" }}>
+                  Duration (minutes)
+                </label>
+                <select
+                  value={newAssessment.duration_minutes}
+                  onChange={(e) => setNewAssessment({...newAssessment, duration_minutes: parseInt(e.target.value)})}
+                  style={{ padding: "12px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, width: "100%", outline: "none" }}
+                >
+                  <option value="15">15 min</option>
+                  <option value="30">30 min</option>
+                  <option value="45">45 min</option>
+                  <option value="60">60 min</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{ padding: "12px 24px", background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#4b5563" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createNewAssessment}
+                disabled={creatingAssessment || !newAssessment.role.trim()}
+                style={{
+                  padding: "12px 24px",
+                  background: newAssessment.role.trim() ? "#10b981" : "#9ca3af",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: newAssessment.role.trim() ? "pointer" : "not-allowed",
+                  fontSize: 14,
+                  fontWeight: 600
+                }}
+              >
+                {creatingAssessment ? "Creating..." : "✅ Create Assessment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Confirmation Modal */}
+      {showEmailModal && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "90%", maxWidth: 500, padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>📧 Send Assessment Email</h2>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 18 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ color: "#374151", marginBottom: 16 }}>
+                Send <strong>{selectedAssessment?.role}</strong> assessment to:
+              </p>
+              
+              <div style={{ background: "#f9fafb", borderRadius: 8, padding: 16, maxHeight: 200, overflow: "auto" }}>
+                {approvedCandidates
+                  .filter((c) =>
+                    emailSelectedCandidates.some((id) => sameId(id, c.candidate_id))
+                  )
+                  .map(c => (
+                    <div key={c.candidate_id} style={{ padding: "8px 0", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>👤</span>
+                      <span style={{ fontWeight: 500 }}>{c.name || "N/A"}</span>
+                      <span style={{ color: "#6b7280" }}>{c.email}</span>
+                    </div>
+                  ))}
+              </div>
+              
+              <p style={{ color: "#6b7280", fontSize: 13, marginTop: 12 }}>
+                📝 Assessment: {selectedAssessment?.questions_count} questions
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                style={{ padding: "12px 24px", background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, color: "#4b5563" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => sendAssessmentEmail(emailSelectedCandidates)}
+                style={{ padding: "12px 24px", background: "#000000", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 600 }}
+              >
+                ✅ Send {emailSelectedCandidates.length} Email(s)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Placeholder Module Component
+function PlaceholderModule({ name, icon }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.05)", padding: 60, textAlign: "center" }}>
+      <div style={{ fontSize: 64, marginBottom: 16 }}>{icon}</div>
+      <h2 style={{ fontSize: 24, fontWeight: 600, color: "#111", marginBottom: 8 }}>{name}</h2>
+      <p style={{ color: "#6b7280", fontSize: 16, marginBottom: 24 }}>This module is coming soon. Stay tuned for updates!</p>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", background: "#f3f4f6", borderRadius: 8, color: "#6b7280", fontSize: 14 }}>
+        <span>🔒</span>
+        <span>Module integration pending</span>
+      </div>
+    </div>
+  );
+}
+
+// Coding Challenges Section - Shows passed assessment candidates
+// Has dropdown to select challenge, checkbox for candidates, and email sending
+function CodingChallengesSection({ testResults, passingThreshold, onManageChallenges, codingThreshold, onSetCodingThreshold, onInterviewInvitationsSent }) {
+  const [codingChallenges, setCodingChallenges] = useState([]);
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
+  const [selectedCandidates, setSelectedCandidates] = useState([]);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSelectedCandidates, setEmailSelectedCandidates] = useState([]);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [codingSubmissions, setCodingSubmissions] = useState([]);
+  const [activeTab, setActiveTab] = useState("send"); // "send" or "results"
+  const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [localThreshold, setLocalThreshold] = useState(codingThreshold || 60);
+  const [sendingInterviewEmail, setSendingInterviewEmail] = useState(false);
+  const [showInterviewEmailModal, setShowInterviewEmailModal] = useState(false);
+  const [interviewSendList, setInterviewSendList] = useState([]);
+  const [selectedInterviewEmails, setSelectedInterviewEmails] = useState([]);
+  const [aiInterviewRole, setAiInterviewRole] = useState("Software Engineer");
+  const [aiInterviewQuestions, setAiInterviewQuestions] = useState(5);
+
+  const passedCandidates = testResults.filter(r => (r.score_percentage || r.score || 0) >= passingThreshold);
+
+  /** Best submission per email so duplicate attempts don't duplicate "qualified" rows */
+  const bestSubmissionByEmail = useMemo(() => {
+    const map = new Map();
+    for (const s of codingSubmissions) {
+      const raw = (s.candidate_email || "").trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      const score = s.score != null ? Number(s.score) : -1;
+      const prev = map.get(key);
+      const prevScore = prev && prev.score != null ? Number(prev.score) : -1;
+      if (!prev || score > prevScore) {
+        map.set(key, { ...s, candidate_email: raw });
+      }
+    }
+    return Array.from(map.values());
+  }, [codingSubmissions]);
+
+  const passedCodingCandidates = useMemo(() => {
+    return bestSubmissionByEmail.filter((s) => {
+      const st = (s.status || "").toLowerCase();
+      const okStatus =
+        !st ||
+        st === "completed" ||
+        st === "submitted" ||
+        st === "graded" ||
+        st === "success";
+      const score = Number(s.score);
+      return okStatus && !Number.isNaN(score) && score >= codingThreshold;
+    });
+  }, [bestSubmissionByEmail, codingThreshold]);
+
+  const sendInterviewInvitations = async (emails) => {
+    if (emails.length === 0) {
+      alert("No candidates to send invitations to");
+      return;
+    }
+    try {
+      setSendingInterviewEmail(true);
+      const res = await fetch("http://localhost:8000/api/hr/send-interview-invitation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          candidate_emails: emails,
+          role: aiInterviewRole,
+          questions: aiInterviewQuestions
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success === true) {
+        alert(`✅ ${data.message || "Invitations sent"}`);
+        setShowInterviewEmailModal(false);
+        setInterviewSendList([]);
+        onInterviewInvitationsSent?.();
+      } else {
+        alert(`❌ Failed: ${data.error || data.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error sending interview invitations:", err);
+      alert("Failed to send interview invitations");
+    } finally {
+      setSendingInterviewEmail(false);
+    }
+  };
+
+  const toggleSelectInterviewCandidate = (email) => {
+    const e = (email || "").trim();
+    if (!e) return;
+    setSelectedInterviewEmails((prev) =>
+      prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]
+    );
+  };
+
+  const selectAllInterviewQualified = () => {
+    const emails = passedCodingCandidates.map((s) => s.candidate_email).filter(Boolean);
+    if (selectedInterviewEmails.length === emails.length) {
+      setSelectedInterviewEmails([]);
+    } else {
+      setSelectedInterviewEmails(emails);
+    }
+  };
+
+  const openInterviewEmailModal = () => {
+    if (selectedInterviewEmails.length === 0) {
+      alert("Select at least one candidate who passed the coding threshold.");
+      return;
+    }
+    setInterviewSendList([...selectedInterviewEmails]);
+    setShowInterviewEmailModal(true);
+  };
+
+  const toggleInterviewSendEmail = (email) => {
+    const e = (email || "").trim();
+    if (!e) return;
+    setInterviewSendList((prev) =>
+      prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]
+    );
+  };
+
+  const selectAllInterviewSendList = () => {
+    if (interviewSendList.length === selectedInterviewEmails.length) {
+      setInterviewSendList([]);
+    } else {
+      setInterviewSendList([...selectedInterviewEmails]);
+    }
+  };
+
+  useEffect(() => {
+    fetchCodingChallenges();
+    fetchCodingSubmissions();
+  }, []);
+
+  useEffect(() => {
+    setLocalThreshold(codingThreshold ?? 60);
+  }, [codingThreshold]);
+
+  const fetchCodingChallenges = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/coding/challenges");
+      if (res.ok) {
+        const data = await res.json();
+        setCodingChallenges(data.challenges || []);
+        if (data.challenges && data.challenges.length > 0) {
+          setSelectedChallenge(data.challenges[0]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch coding challenges:", err);
+    }
+  };
+
+  const fetchCodingSubmissions = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/coding/all-submissions-for-hr");
+      if (res.ok) {
+        const data = await res.json();
+        setCodingSubmissions(data.submissions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch coding submissions:", err);
+    }
+  };
+
+  const toggleSelectCandidate = (candidateEmail) => {
+    setSelectedCandidates(prev => 
+      prev.includes(candidateEmail) ? prev.filter(e => e !== candidateEmail) : [...prev, candidateEmail]
+    );
+  };
+
+  const selectAllCandidates = () => {
+    const emails = passedCandidates.map(c => c.candidate_email || c.email);
+    if (selectedCandidates.length === emails.length) {
+      setSelectedCandidates([]);
+    } else {
+      setSelectedCandidates(emails);
+    }
+  };
+
+  const toggleEmailCandidate = (candidateEmail) => {
+    setEmailSelectedCandidates(prev => 
+      prev.includes(candidateEmail) ? prev.filter(e => e !== candidateEmail) : [...prev, candidateEmail]
+    );
+  };
+
+  const selectAllEmailCandidates = () => {
+    const emails = passedCandidates.map(c => c.candidate_email || c.email);
+    if (emailSelectedCandidates.length === emails.length) {
+      setEmailSelectedCandidates([]);
+    } else {
+      setEmailSelectedCandidates(emails);
+    }
+  };
+
+  const sendCodingChallengeEmail = async (candidateEmails) => {
+    if (!selectedChallenge) {
+      alert("Please select a coding challenge first");
+      return;
+    }
+
+    if (candidateEmails.length === 0) {
+      alert("Please select candidates to send coding challenge to");
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      const res = await fetch("http://localhost:8000/api/coding/send-challenge-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge_id: selectedChallenge.challenge_id,
+          candidate_emails: candidateEmails
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.message}`);
+        setShowEmailModal(false);
+        setEmailSelectedCandidates([]);
+      } else {
+        alert(`❌ Failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error sending coding challenge email:", err);
+      alert("Failed to send coding challenge email");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* Header Section */}
+      <div style={{
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        padding: 24,
+        marginBottom: 24
+      }}>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111", margin: "0 0 16px 0" }}>
+          💻 Send Coding Challenge
+        </h3>
+        
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          {/* Challenge Selection Dropdown */}
+          <div style={{ flex: 1, minWidth: 250 }}>
+            <label style={{ fontSize: 13, color: "#6b7280", marginBottom: 8, display: "block" }}>
+              Select Coding Challenge:
+            </label>
+            <select
+              value={selectedChallenge?.challenge_id || ""}
+              onChange={(e) => {
+                const challenge = codingChallenges.find(c => c.challenge_id === e.target.value);
+                setSelectedChallenge(challenge);
+              }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 8,
+                fontSize: 14,
+                outline: "none"
+              }}
+            >
+              {codingChallenges.length === 0 ? (
+                <option value="">No challenges available - Create one first</option>
+              ) : (
+                codingChallenges.map(c => (
+                  <option key={c.challenge_id} value={c.challenge_id}>
+                    {c.title} ({c.difficulty}) - {c.language}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <button
+            onClick={onManageChallenges}
+            style={{
+              padding: "12px 24px",
+              background: "#6b7280",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 600
+            }}
+          >
+            🔧 Manage Challenges
+          </button>
+        </div>
+      </div>
+
+      {/* Passed Candidates Selection Section */}
+      {passedCandidates.length > 0 ? (
+        <div style={{
+          background: "#fff",
+          borderRadius: 12,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          padding: 24,
+          marginBottom: 24
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h4 style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: 0 }}>
+              ✅ Passed Assessment Candidates ({passedCandidates.length})
+            </h4>
+            <span style={{ fontSize: 13, color: "#6b7280" }}>
+              (Score ≥ {passingThreshold}% threshold)
+            </span>
+          </div>
+
+          <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={selectedCandidates.length === passedCandidates.length && passedCandidates.length > 0}
+                onChange={selectAllCandidates}
+                style={{ width: 18, height: 18, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: 14, fontWeight: 500 }}>Select All</span>
+            </label>
+            <button
+              onClick={() => {
+                setEmailSelectedCandidates([...selectedCandidates]);
+                setShowEmailModal(true);
+              }}
+              disabled={selectedCandidates.length === 0}
+              style={{
+                padding: "10px 20px",
+                background: selectedCandidates.length > 0 ? "#000000" : "#9ca3af",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                cursor: selectedCandidates.length > 0 ? "pointer" : "not-allowed",
+                fontSize: 14,
+                fontWeight: 600
+              }}
+            >
+              📧 Send to {selectedCandidates.length} Selected
+            </button>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Select</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Email</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Role</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Assessment Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {passedCandidates.map((candidate, idx) => {
+                  const score = candidate.score_percentage || candidate.score || 0;
+                  const email = candidate.candidate_email || candidate.email;
+                  return (
+                    <tr key={idx} style={{ 
+                      borderBottom: "1px solid #e5e7eb",
+                      background: selectedCandidates.includes(email) ? "#eff6ff" : "#fff"
+                    }}>
+                      <td style={{ padding: "12px 16px" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedCandidates.includes(email)}
+                          onChange={() => toggleSelectCandidate(email)}
+                          style={{ width: 18, height: 18, cursor: "pointer" }}
+                        />
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: 14, color: "#111" }}>
+                        {email}
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: 14, color: "#6b7280" }}>
+                        {candidate.role || "N/A"}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{
+                          padding: "4px 12px",
+                          background: "#10b981",
+                          color: "#fff",
+                          borderRadius: 6,
+                          fontSize: 13,
+                          fontWeight: 600
+                        }}>
+                          {score.toFixed(0)}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          background: "#fff",
+          borderRadius: 12,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          padding: 48,
+          textAlign: "center"
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111", marginBottom: 8 }}>
+            No Passed Candidates Yet
+          </h3>
+          <p style={{ color: "#6b7280", fontSize: 14, marginBottom: 20 }}>
+            Candidates who pass the technical assessment (≥ {passingThreshold}% score) will automatically appear here.
+          </p>
+          <button
+            onClick={onManageChallenges}
+            style={{
+              padding: "12px 24px",
+              background: "#6b7280",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 600
+            }}
+          >
+            🔧 Manage Coding Challenges
+          </button>
+        </div>
+      )}
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "#fff",
+            borderRadius: 12,
+            padding: 32,
+            width: "90%",
+            maxWidth: 600,
+            boxShadow: "0 20px 40px rgba(0,0,0,0.2)"
+          }}>
+            <h3 style={{ fontSize: 20, fontWeight: 600, color: "#111", marginBottom: 24 }}>
+              📧 Send Coding Challenge Email
+            </h3>
+
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 12 }}>
+                Selected Challenge: <strong>{selectedChallenge?.title || "None"}</strong>
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={emailSelectedCandidates.length === passedCandidates.length && passedCandidates.length > 0}
+                  onChange={selectAllEmailCandidates}
+                  style={{ width: 18, height: 18, cursor: "pointer" }}
+                />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Select All</span>
+              </label>
+              <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
+                {passedCandidates.map((candidate, idx) => {
+                  const email = candidate.candidate_email || candidate.email;
+                  return (
+                    <label key={idx} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", borderBottom: idx < passedCandidates.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                      <input
+                        type="checkbox"
+                        checked={emailSelectedCandidates.includes(email)}
+                        onChange={() => toggleEmailCandidate(email)}
+                        style={{ width: 16, height: 16, cursor: "pointer" }}
+                      />
+                      <span style={{ fontSize: 14 }}>{email}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  setShowEmailModal(false);
+                  setEmailSelectedCandidates([]);
+                }}
+                style={{
+                  padding: "12px 24px",
+                  background: "#e5e7eb",
+                  color: "#374151",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => sendCodingChallengeEmail(emailSelectedCandidates)}
+                disabled={sendingEmail || emailSelectedCandidates.length === 0}
+                style={{
+                  padding: "12px 24px",
+                  background: sendingEmail ? "#9ca3af" : "#000000",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: sendingEmail ? "not-allowed" : "pointer",
+                  fontSize: 14,
+                  fontWeight: 600
+                }}
+              >
+                {sendingEmail ? "Sending..." : `✅ Send ${emailSelectedCandidates.length} Email(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Coding Evaluation Threshold Setting */}
+      <div style={{
+        background: "#fff",
+        borderRadius: 12,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        padding: 24,
+        marginBottom: 24
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: "0 0 4px 0" }}>
+              🎯 Coding Evaluation Threshold
+            </h3>
+            <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>
+              Candidates with coding score ≥ {codingThreshold}% will qualify for AI Interview
+            </p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={localThreshold}
+              onChange={(e) => setLocalThreshold(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+              style={{
+                width: 80,
+                padding: "8px 12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 8,
+                fontSize: 14,
+                textAlign: "center"
+              }}
+            />
+            <button
+              onClick={() => {
+                if (onSetCodingThreshold) {
+                  onSetCodingThreshold(localThreshold);
+                }
+              }}
+              style={{
+                padding: "8px 16px",
+                background: "#000000",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 600
+              }}
+            >
+              Apply Threshold
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Coding Evaluation Results Section */}
+      {codingSubmissions.length > 0 && (
+        <div style={{
+          background: "#fff",
+          borderRadius: 12,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          padding: 24,
+          marginTop: 24
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h4 style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: 0 }}>
+              📋 Coding Challenge Results ({codingSubmissions.length} submissions)
+            </h4>
+            <button
+              onClick={fetchCodingSubmissions}
+              style={{
+                padding: "8px 16px",
+                background: "#6b7280",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 500
+              }}
+            >
+              🔄 Refresh
+            </button>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Email</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Challenge</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Difficulty</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Language</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Score</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Status</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Violations</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {codingSubmissions.map((submission, idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                    <td style={{ padding: "12px 16px", fontSize: 14, color: "#111" }}>
+                      {submission.candidate_email}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14, color: "#6b7280" }}>
+                      {submission.challenge_title || "N/A"}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 13 }}>
+                      <span style={{
+                        padding: "4px 10px",
+                        background: submission.difficulty === "hard" ? "#fef3c7" : submission.difficulty === "medium" ? "#f3f4f6" : "#dcfce7",
+                        color: submission.difficulty === "hard" ? "#92400e" : submission.difficulty === "medium" ? "#111111" : "#166534",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 500
+                      }}>
+                        {submission.difficulty || "N/A"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14, color: "#6b7280" }}>
+                      {submission.language || "N/A"}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14, fontWeight: 600 }}>
+                      <span style={{
+                        padding: "4px 12px",
+                        background: submission.score >= 70 ? "#10b981" : submission.score >= 40 ? "#f59e0b" : "#ef4444",
+                        color: "#fff",
+                        borderRadius: 6,
+                        fontSize: 13
+                      }}>
+                        {submission.score !== null ? `${submission.score}%` : "Pending"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 13 }}>
+                      <span style={{
+                        padding: "4px 10px",
+                        background: submission.status === "completed" ? "#dcfce7" : submission.status === "timed_out" ? "#fef3c7" : "#f3f4f6",
+                        color: submission.status === "completed" ? "#166534" : submission.status === "timed_out" ? "#92400e" : "#6b7280",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 500
+                      }}>
+                        {submission.status || "N/A"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14 }}>
+                      <span style={{
+                        padding: "4px 12px",
+                        background: (submission.violation_count || 0) > 0 ? "#fee2e2" : "#dcfce7",
+                        color: (submission.violation_count || 0) > 0 ? "#dc2626" : "#166534",
+                        borderRadius: 6,
+                        fontSize: 13,
+                        fontWeight: 600
+                      }}>
+                        {(submission.violation_count || 0) === 0 ? "✅ No Violations" : `⚠️ ${submission.violation_count} Violation(s)`}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 12, color: "#6b7280" }}>
+                      {submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : "N/A"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginTop: 16, padding: "12px 16px", background: "#f9fafb", borderRadius: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16 }}>ℹ️</span>
+            <span style={{ fontSize: 13, color: "#6b7280" }}>
+              Showing all {codingSubmissions.length} coding challenge submissions with their scores and violation counts
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Passed Coding Threshold Candidates Section - For AI Interview */}
+      {passedCodingCandidates.length > 0 && (
+        <div style={{
+          background: "#fff",
+          borderRadius: 12,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+          padding: 24,
+          marginTop: 24,
+          border: "2px solid #10b981"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <h4 style={{ fontSize: 16, fontWeight: 600, color: "#111", margin: "0 0 4px 0" }}>
+                ✅ Candidates Qualified for AI Interview ({passedCodingCandidates.length})
+              </h4>
+              <span style={{ fontSize: 12, color: "#10b981", fontWeight: 500 }}>
+                Score ≥ {codingThreshold}% threshold
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={openInterviewEmailModal}
+                disabled={sendingInterviewEmail || selectedInterviewEmails.length === 0}
+                style={{
+                  padding: "10px 20px",
+                  background:
+                    sendingInterviewEmail || selectedInterviewEmails.length === 0 ? "#9ca3af" : "#000000",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor:
+                    sendingInterviewEmail || selectedInterviewEmails.length === 0 ? "not-allowed" : "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                📧 Send AI interview link ({selectedInterviewEmails.length} selected)
+              </button>
+              <button
+                onClick={() => window.location.href = "/ai-interview"}
+                type="button"
+                style={{
+                  padding: "10px 20px",
+                  background: "#0ea5e9",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                🎤 Open interview module
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginBottom: 12,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={
+                  passedCodingCandidates.length > 0 &&
+                  selectedInterviewEmails.length === passedCodingCandidates.length
+                }
+                onChange={selectAllInterviewQualified}
+                style={{ width: 18, height: 18, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: 14, fontWeight: 500 }}>Select all qualified</span>
+            </label>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Same email flow as coding challenge: confirm recipients in the modal, then SMTP sends the link.
+            </span>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#ecfdf5", borderBottom: "2px solid #10b981" }}>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      textAlign: "left",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#065f46",
+                    }}
+                  >
+                    Select
+                  </th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#065f46" }}>Email</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#065f46" }}>Challenge</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#065f46" }}>Role</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#065f46" }}>Score</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#065f46" }}>Violations</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#065f46" }}>Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {passedCodingCandidates.map((submission, idx) => (
+                  <tr
+                    key={idx}
+                    style={{
+                      borderBottom: "1px solid #d1fae5",
+                      background: selectedInterviewEmails.includes(submission.candidate_email)
+                        ? "#dcfce7"
+                        : "#f0fdf4",
+                    }}
+                  >
+                    <td style={{ padding: "12px 16px" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedInterviewEmails.includes(submission.candidate_email)}
+                        onChange={() => toggleSelectInterviewCandidate(submission.candidate_email)}
+                        style={{ width: 18, height: 18, cursor: "pointer" }}
+                      />
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14, color: "#111", fontWeight: 500 }}>
+                      {submission.candidate_email}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14, color: "#065f46" }}>
+                      {submission.challenge_title || "N/A"}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: "#6b7280" }}>
+                      {submission.role || "N/A"}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14, fontWeight: 700 }}>
+                      <span style={{
+                        padding: "4px 12px",
+                        background: "#10b981",
+                        color: "#fff",
+                        borderRadius: 6,
+                        fontSize: 13
+                      }}>
+                        {submission.score}%
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 14 }}>
+                      {(submission.violation_count || 0) === 0 ? (
+                        <span style={{ color: "#10b981", fontWeight: 600 }}>✅ Clean</span>
+                      ) : (
+                        <span style={{ color: "#ef4444", fontWeight: 600 }}>⚠️ {submission.violation_count}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 12, color: "#6b7280" }}>
+                      {submission.submitted_at ? new Date(submission.submitted_at).toLocaleDateString() : "N/A"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginTop: 16, padding: "12px 16px", background: "#ecfdf5", borderRadius: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16 }}>🎯</span>
+            <span style={{ fontSize: 13, color: "#065f46", fontWeight: 500 }}>
+              {passedCodingCandidates.length} candidate(s) passed the {codingThreshold}% coding threshold and are eligible for AI Interview
+            </span>
+          </div>
+          <p style={{ marginTop: 12, marginBottom: 0, fontSize: 13, color: "#64748b" }}>
+            View all AI interview sessions and HR reports under the <strong>Interviews</strong> module in the sidebar.
+          </p>
+        </div>
+      )}
+
+      {showInterviewEmailModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              padding: 32,
+              width: "90%",
+              maxWidth: 560,
+              boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h3 style={{ fontSize: 20, fontWeight: 600, color: "#111", marginBottom: 8 }}>
+              📧 Send AI interview invitation
+            </h3>
+            <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>
+              Uses the same SMTP settings as coding challenge emails. Link points to{" "}
+              <strong>/ai-interview</strong> on your <code>FRONTEND_URL</code> (default
+              http://localhost:5173).
+            </p>
+
+            <div style={{ marginBottom: 16, display: "flex", gap: "10px", flexDirection: "column" }}>
+              <div>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                  Job Role assigned to Interview
+                </label>
+                <input
+                  type="text"
+                  value={aiInterviewRole}
+                  onChange={(e) => setAiInterviewRole(e.target.value)}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 14 }}
+                  placeholder="e.g. Software Engineer"
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+                  Number of Generated Questions
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={aiInterviewQuestions}
+                  onChange={(e) => setAiInterviewQuestions(Number(e.target.value))}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 14 }}
+                />
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 12 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={
+                    interviewSendList.length === selectedInterviewEmails.length &&
+                    selectedInterviewEmails.length > 0
+                  }
+                  onChange={selectAllInterviewSendList}
+                  style={{ width: 18, height: 18, cursor: "pointer" }}
+                />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Select all in this list</span>
+              </label>
+              <div
+                style={{
+                  maxHeight: 220,
+                  overflowY: "auto",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  padding: 12,
+                }}
+              >
+                {selectedInterviewEmails.map((email, idx) => (
+                  <label
+                    key={email}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 0",
+                      cursor: "pointer",
+                      borderBottom:
+                        idx < selectedInterviewEmails.length - 1 ? "1px solid #f3f4f6" : "none",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={interviewSendList.includes(email)}
+                      onChange={() => toggleInterviewSendEmail(email)}
+                      style={{ width: 16, height: 16, cursor: "pointer" }}
+                    />
+                    <span style={{ fontSize: 14 }}>{email}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInterviewEmailModal(false);
+                  setInterviewSendList([]);
+                }}
+                style={{
+                  padding: "12px 24px",
+                  background: "#e5e7eb",
+                  color: "#374151",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => sendInterviewInvitations(interviewSendList)}
+                disabled={sendingInterviewEmail || interviewSendList.length === 0}
+                style={{
+                  padding: "12px 24px",
+                  background:
+                    sendingInterviewEmail || interviewSendList.length === 0 ? "#9ca3af" : "#000000",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor:
+                    sendingInterviewEmail || interviewSendList.length === 0 ? "not-allowed" : "pointer",
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {sendingInterviewEmail ? "Sending…" : `✅ Send ${interviewSendList.length} email(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {codingSubmissions.length === 0 && (
+        <div style={{
+          background: "#fff",
+          borderRadius: 12,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          padding: 32,
+          marginTop: 24,
+          textAlign: "center"
+        }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
+          <h4 style={{ fontSize: 16, fontWeight: 600, color: "#111", marginBottom: 8 }}>
+            No Coding Submissions Yet
+          </h4>
+          <p style={{ fontSize: 14, color: "#6b7280" }}>
+            Coding challenge submissions will appear here once candidates complete their challenges
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
