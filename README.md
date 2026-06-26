@@ -4,6 +4,17 @@ An intelligent, enterprise-grade talent acquisition and end-to-end recruitment p
 
 ---
 
+## 📸 System Interface Preview
+
+<p align="center">
+  <img src="./screenshots/ss1.png" width="45%" alt="Module Preview 1" />
+  <img src="./screenshots/ss2.png" width="45%" alt="Module Preview 2" />
+   <img src="./screenshots/ss3.png" width="45%" alt="Module Preview 3" />
+   <img src="./screenshots/ss4.png" width="45%" alt="Module Preview 4" />
+   <img src="./screenshots/ss5.png" width="45%" alt="Module Preview 5" />
+   <img src="./screenshots/ss6.png" width="45%" alt="Module Preview 6" />
+</p>
+
 ## 📸 System Architecture & Visual Workflows
 
 Detailed visual schematics and behavioral workflows can be referenced in the system documentation:
