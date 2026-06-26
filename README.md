@@ -6,11 +6,9 @@ An intelligent, enterprise-grade talent acquisition and end-to-end recruitment p
 
 ## 📸 System Interface Preview
 
-## 📸 System Interface Preview
-
 <p align="center">
   <!-- Row 1 -->
-  <img src="ss3.jpeg" width="48%" alt="Home Page" />
+  <img src="ss3.png" width="48%" alt="Home Page" />
   <img src="ss2.png" width="48%" alt="Home Page 2" />
   <br/><br/>
   
@@ -20,7 +18,7 @@ An intelligent, enterprise-grade talent acquisition and end-to-end recruitment p
   <br/><br/>
   
   <!-- Row 3 -->
-  <img src="ss1.png" width="48%" alt="Coding Assessment" />
+  <img src="ss1.jpeg" width="48%" alt="Coding Assessment" />
   <img src="ss6.png" width="48%" alt="Interview Page" />
 </p>
 
